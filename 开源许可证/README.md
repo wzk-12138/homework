@@ -1,31 +1,18 @@
-# 开源许可证 · Apache Maven 许可证合规检测
+# Apache Maven 许可证合规检测
 
-上海杉达学院《开源创新思维》第 2 章作业 1：用 Apache Creadur RAT 0.18 扫描 Apache Maven 3.9.9 源码包，产出许可证头的合规检测报告。
+用 **Apache Creadur RAT 0.18** 扫描 Apache Maven 3.9.9 官方源码包，找出缺失许可证头的文件与混入的第三方许可证，并把 548 条原始告警收敛成一份可执行的处置清单。
 
-## 报告文件
+## 检测对象
 
-`f25011434-王喆楷-Apache Maven-软件许可测试报告.docx`
-
-正文 5 页，按课程模板排版（宋体五号、首行缩进 2 字符、1.25 倍行距），依次为：项目介绍 → 工具选型与安装（含踩坑） → 检测报告 → 逐条分析。
-
-## 检测概要
-
-| 项 | 结果 |
+| | |
 | --- | --- |
-| 被检项目 | Apache Maven 3.9.9 官方源码包（ASF 顶级项目，Apache-2.0） |
-| 代码规模 | 14 个模块、2099 个文件、约 13 MB，Java 源文件 1025 个 |
-| 检测工具 | Apache Creadur RAT 0.18（单 fat-jar，JDK 21 运行，.sha512 校验通过） |
-| 通过 | 1478 个（Apache-2.0 1477、MIT 1） |
-| 未通过 | 标准文件 548 个（Unknown 547、GPL-2.0 1）；计入归档/二进制/声明共 621 个 |
+| 项目 | Apache Maven 3.9.9（ASF 顶级项目，Apache-2.0 单一许可） |
+| 来源 | 官方 `apache-maven-3.9.9-src.zip`（archive.apache.org） |
+| 规模 | 14 个模块、2099 个文件、约 13 MB，Java 源文件 1025 个 |
 
-## 分析结论
+## 检测方法
 
-- **535 个（97.6%）告警在 `src/test`**：测试用伪仓库、测试 POM、`.sha1/.md5` 校验和、`.snapshot-version`，属测试输入数据，应配置排除规则而非补许可证头。
-- **生产代码的真实问题仅 4 个** `package-info.java`：首行是 `// CHECKSTYLE_OFF: RegexpHeader`，包说明由 `maven.mdo` 生成，属有意的既定例外。
-- **4 个第三方许可证文本属误报**：`javax.annotation-api-1.3.2.txt` 同时含 CDDL 与 GPL-2.0 表述，RAT 按文本匹配判成 GPL-2.0——工具把「许可证正文」当成了「代码的许可声明」，实际是 CDDL/GPL 双许可，择 CDDL 即可。
-- **交叉验证**：Maven 根 `pom.xml` 自带的 `apache-rat-plugin` 排除清单（`src/test/**`、`**/*.svg`、三个许可证文本）与本次 548 个告警高度重合，说明工具输出可信，但只是「待裁定清单」。
-
-## 复现命令
+RAT 是 ASF 官方发布审计工具，逐文件匹配许可证头，输出文件级清单，正适合回答「哪个文件缺头、哪个文件带了别的许可证」。
 
 ```bash
 curl -O https://dlcdn.apache.org/creadur/apache-rat-0.18/apache-rat-0.18-bin.tar.gz
@@ -34,4 +21,30 @@ java -Dfile.encoding=UTF-8 -jar apache-rat-0.18/apache-rat-0.18.jar \
      --counter-max "UNAPPROVED:-1" --output-file rat.txt -- apache-maven-3.9.9
 ```
 
-注意两点：0.18 里 `-f` 已改义为 `--force`，输出要用 `--output-file`、目录要用 `--` 分隔；默认阈值要求 `UNAPPROVED` 为 0，否则扫描结束会抛异常退出（报告此时已写出），只需报告时用 `--counter-max "UNAPPROVED:-1"`（分隔符是冒号）。
+0.18 里 `-f` 已改义为 `--force`（把许可证头写回源文件），输出要用 `--output-file`、目录用 `--` 分隔；默认要求 `UNAPPROVED` 计数为 0，否则扫描结束抛异常退出（此时报告已写出），只想出报告就加 `--counter-max "UNAPPROVED:-1"`。
+
+## 检测结果
+
+| 计数器 | 数值 | 说明 |
+| --- | --- | --- |
+| Approved | 1478 | Apache-2.0 1477、MIT 1 |
+| Unapproved | 548 | 标准文件中未通过：Unknown 547、GPL-2.0 1 |
+| Archives / Binaries / Notices | 53 / 12 / 8 | 归档、二进制、声明文件，均未通过 |
+| Standards / Ignored | 2026 / 4 | 参与判定的文本文件 / 默认排除 |
+
+## 处置结论
+
+原始 548 条告警不等于 548 处违规，逐条核对后分为四类：
+
+1. **535 条（97.6%）在 `src/test`** —— 测试用伪仓库、测试 POM、`.sha1/.md5` 校验和、`.snapshot-version`，是被测试程序读取的输入数据，加头会破坏断言。**处置：配置排除规则**。
+2. **4 个 `package-info.java`** —— 首行是 `// CHECKSTYLE_OFF: RegexpHeader`，包说明由 `maven.mdo` 生成，属有意的既定例外。**处置：加入排除清单**。
+3. **4 个第三方许可证文本** —— EPL-1.0/2.0、aopalliance、javax.annotation-api，本身就是分发给他人的许可证全文。其中 `javax.annotation-api-1.3.2.txt` 含 CDDL 与 GPL-2.0 两段表述，被判成 GPL-2.0，属**许可证文本误报**；实为 CDDL/GPL 双许可，择 CDDL 即可。**处置：调整白名单，不做代码改动**。
+4. **5 个配置/资源文件** —— `m2.conf`、`maven-deps.svg`、示例工程 `App.java`、两份测试说明文本，本无头部惯例。**处置：无需处理**。
+
+**交叉验证**：Maven 根 `pom.xml` 自带的 `apache-rat-plugin` 排除清单（`src/test/**`、`**/*.svg`、三个许可证文本）与上述分类高度重合，说明工具输出可信，但只是「待裁定清单」，必须叠加人工归类。
+
+## 文件说明
+
+| 文件 | 说明 |
+| --- | --- |
+| `f25011434-王喆楷-Apache Maven-软件许可测试报告.docx` | 课程作业报告，正文 5 页：项目介绍 → 工具选型与安装 → 检测报告 → 逐条分析 |

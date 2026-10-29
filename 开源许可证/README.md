@@ -12,16 +12,7 @@
 
 ## 检测方法
 
-RAT 是 ASF 官方发布审计工具，逐文件匹配许可证头，输出文件级清单，正适合回答「哪个文件缺头、哪个文件带了别的许可证」。
-
-```bash
-curl -O https://dlcdn.apache.org/creadur/apache-rat-0.18/apache-rat-0.18-bin.tar.gz
-tar -xzf apache-rat-0.18-bin.tar.gz
-java -Dfile.encoding=UTF-8 -jar apache-rat-0.18/apache-rat-0.18.jar \
-     --counter-max "UNAPPROVED:-1" --output-file rat.txt -- apache-maven-3.9.9
-```
-
-0.18 里 `-f` 已改义为 `--force`（把许可证头写回源文件），输出要用 `--output-file`、目录用 `--` 分隔；默认要求 `UNAPPROVED` 计数为 0，否则扫描结束抛异常退出（此时报告已写出），只想出报告就加 `--counter-max "UNAPPROVED:-1"`。
+RAT 是 ASF 官方发布审计工具，逐文件匹配许可证头，输出文件级清单，正适合回答「哪个文件缺头、哪个文件带了别的许可证」。以官方 `-bin` 包解压即用的 fat-jar 运行，扫描对象为 Maven 源码包根目录，结果同时输出文本报告与 XML 结构化报告，便于逐文件统计。
 
 ## 检测结果
 
